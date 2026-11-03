@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>⚠️ 系统异常</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    width:100%;
+    height:100%;
+    height:100dvh;            /* 动态视口高度：地址栏收起/横屏/折叠屏都正确 */
+    background:#fff; overflow:hidden;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    transition: background .8s ease;
+  }
+  body.dark { background:#0a0a0c; }
+
+  body.paused .warn,
+  body.paused #warnings,
+  body.paused .fakeDialog { animation-play-state: paused !important; }
+
+  #warnings {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+    gap:6px 10px;
+    max-width:96vw;
+    max-height:96vh;          /* fallback */
+    max-height:96dvh;
+    overflow:hidden; padding:2vmin; text-align:center;
+  }
+
+  .warn {
+    display:inline-block;
+    width:8vmin; height:8vmin;
+    flex-shrink:0;
+    animation: pulse 1.2s ease-in-out infinite;
+    user-select:none; pointer-events:none;
+    vertical-align:middle;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%     { opacity:.7; transform:scale(.92); }
+  }
+
+  #warnings.small .warn { width:5vmin;   height:5vmin; }
+  #warnings.tiny  .warn { width:3.2vmin; height:3.2vmin; }
+  #warnings.micro .warn { width:2vmin;   height:2vmin; }
+  #warnings.ultra .warn { width:1.2vmin; height:1.2vmin; }
+  #warnings.micro { gap:3px 6px; }
+  #warnings.ultra { gap:2px 4px; }
+
+  #warnings.shake { animation: shake .18s linear infinite; }
+  @keyframes shake {
+    0%   { transform:translate(0,0); }
+    25%  { transform:translate(-2px,1px); }
+    50%  { transform:translate(1px,-2px); }
+    75%  { transform:translate(2px,1px); }
+    100% { transform:translate(0,0); }
+  }
+
+  #escHint {
+    position:fixed;
+    top:calc(10px + env(safe-area-inset-top, 0px));
+    right:calc(14px + env(safe-area-inset-right, 0px));
+    z-index:3000;
+    font:inherit; font-size:11px; letter-spacing:1px;
+    color:#bbb; background:transparent; border:0;
+    padding:6px 8px; cursor:pointer; user-select:none; border-radius:4px;
+    transition:color .2s;
+  }
+  #escHint:hover, #escHint:focus-visible {
+    color:#ff3b30; background:rgba(0,0,0,.05); outline:none;
+  }
+
+  #label {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    font-size:6vmin; font-weight:800;
+    color:rgba(255,59,48,.85);
+    text-shadow:0 0 20px rgba(255,59,48,.5);
+    pointer-events:none; user-select:none;
+    z-index:5; letter-spacing:2px; display:none;
+  }
+  #vignette {
+    position:fixed; inset:0; pointer-events:none; z-index:8;
+    opacity:0; transition:opacity 1.2s ease;
+    background: radial-gradient(ellipse at center,
+      transparent 30%, rgba(0,0,0,.55) 80%, rgba(0,0,0,.9) 100%);
+  }
+  #vignette.on { opacity:1; }
+
+  .fakeDialog {
+    position:fixed;
+    width:300px;
+    max-width:calc(100vw - 16px);
+    max-height:calc(100dvh - 16px);
+    background:#f0f0f0; border:1px solid #999; border-radius:6px;
+    box-shadow:0 8px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.15);
+    font-size:13px; color:#1a1a1a; z-index:1000; overflow:hidden;
+    animation: dlgIn .25s cubic-bezier(.2,1.4,.5,1);
+  }
+  @keyframes dlgIn {
+    0%   { transform:scale(.85); opacity:0; }
+    100% { transform:scale(1);   opacity:1; }
+  }
+  body.dark .fakeDialog { background:#2a2a2e; border-color:#555; color:#e8e8e8; }
+
+  .fakeDialog .titlebar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 8px 6px 10px;
+    background:linear-gradient(#fbfbfb,#e8e8e8);
+    border-bottom:1px solid #ccc;
+    font-weight:600; font-size:12px; cursor:default;
+    touch-action:none;
+  }
+  body.dark .fakeDialog .titlebar {
+    background:linear-gradient(#3a3a40,#2a2a2e); border-bottom-color:#444;
+  }
+  .fakeDialog .btns span {
+    display:inline-block; width:14px; height:14px; line-height:12px;
+    text-align:center; border-radius:2px; font-size:10px;
+    color:#555; background:#ddd; cursor:pointer; user-select:none;
+  }
+  .fakeDialog .btns span:hover { background:#ccc; }
+  .fakeDialog .body { padding:14px 14px 16px; display:flex; gap:12px; align-items:flex-start; }
+  .fakeDialog .body .icon {
+    width:26px; height:26px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .fakeDialog .body .icon svg { display:block; width:100%; height:100%; }
+  .fakeDialog .body .msg { line-height:1.45; word-break:break-word; }
+  .fakeDialog .body .msg .sub { display:block; margin-top:6px; font-size:11px; opacity:.6; }
+  .fakeDialog .footer { padding:0 14px 14px; text-align:right; }
+  .fakeDialog .footer button {
+    font:inherit; font-size:12px; padding:4px 16px;
+    border:1px solid #aaa; border-radius:4px;
+    background:linear-gradient(#fff,#eee); cursor:pointer;
+  }
+  .fakeDialog .footer button:hover { background:#f5f5f5; }
+  body.dark .fakeDialog .footer button {
+    background:linear-gradient(#444,#333); border-color:#666; color:#eee;
+  }
+
+  .fakeDialog.web { width:340px; }
+  .fakeDialog .web-body { padding:8px; background:#111; }
+  body.dark .fakeDialog .web-body { background:#0d0d10; }
+  .fakeDialog .web-body iframe {
+    display:block; width:100%; height:190px;
+    border:1px solid #333; border-radius:3px;
+    background:#000;
+  }
+
+  .fakeDialog.noise { width:320px; }
+  .fakeDialog .noise-body {
+    height:160px; padding:6px 8px;
+    background:#050805; overflow:hidden;
+  }
+  body.dark .fakeDialog .noise-body { background:#020402; }
+  .fakeDialog .noise-lines {
+    height:100%; overflow:hidden;
+    font-family:'Courier New', Consolas, 'Cascadia Code', monospace;
+    font-size:11px; line-height:1.4;
+    color:#39ff14;
+    text-shadow:0 0 4px rgba(57,255,20,.45);
+    white-space:pre;
+  }
+  .fakeDialog .noise-lines > div {
+    white-space:pre; overflow:hidden; text-overflow:ellipsis;
+  }
+  .fakeDialog .noise-lines > div:last-child { color:#b6ffb0; }
+
+  .fakeDialog.static { width:340px; }
+  .fakeDialog .static-body {
+    padding:8px;
+    background:#111;
+    position:relative;
+  }
+  body.dark .fakeDialog .static-body { background:#0d0d10; }
+  .fakeDialog .static-body canvas {
+    display:block;
+    width:100%;
+    height:190px;
+    border:1px solid #333;
+    border-radius:3px;
+    background:#000;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .fakeDialog .static-body::after {
+    content:'';
+    position:absolute;
+    left:9px; right:9px; top:9px; bottom:9px;
+    pointer-events:none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.28) 0px,
+      rgba(0,0,0,0.28) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    border-radius:3px;
+    mix-blend-mode: multiply;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .warn, #warnings.shake { animation:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SVG 精灵图（原样保留） ============ -->
+<svg width="0" height="0" aria-hidden="true" focusable="false"
+     style="position:absolute;overflow:hidden">
+  <defs>
+    <linearGradient id="warnGrad" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0%"   stop-color="#ffdb4d"/>
+      <stop offset="28%"  stop-color="#ffb300"/>
+      <stop offset="62%"  stop-color="#ff7b00"/>
+      <stop offset="100%" stop-color="#c20000"/>
+    </linearGradient>
+    <linearGradient id="warnHi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.65"/>
+      <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="warnInner" cx="0.5" cy="0.38" r="0.7">
+      <stop offset="0%"   stop-color="#fff3b8" stop-opacity="0.85"/>
+      <stop offset="60%"  stop-color="#ffb300" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ff7b00" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="sysRed" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ff6b6b"/>
+      <stop offset="60%"  stop-color="#e02020"/>
+      <stop offset="100%" stop-color="#a80000"/>
+    </linearGradient>
+    <linearGradient id="sysYellow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffe68a"/>
+      <stop offset="60%"  stop-color="#f5b800"/>
+      <stop offset="100%" stop-color="#c78a00"/>
+    </linearGradient>
+    <linearGradient id="sysOrange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffb36b"/>
+      <stop offset="60%"  stop-color="#ff7b00"/>
+      <stop offset="100%" stop-color="#c84a00"/>
+    </linearGradient>
+    <linearGradient id="sysGray" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#e8e8ec"/>
+      <stop offset="100%" stop-color="#9a9aa0"/>
+    </linearGradient>
+    <linearGradient id="sysBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#7cc4ff"/>
+      <stop offset="60%"  stop-color="#2196f3"/>
+      <stop offset="100%" stop-color="#0d5fa8"/>
+    </linearGradient>
+
+    <symbol id="warnIcon" viewBox="0 0 100 100">
+      <path d="M50 14 L91 86 Q93 92 87 92 L13 92 Q7 92 9 86 Z"
+            fill="#1a0000" opacity="0.5"/>
+      <path d="M50 12 L91 84 Q93 90 87 90 L13 90 Q7 90 9 84 Z"
+            fill="url(#warnGrad)"
+            stroke="#4d0000" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M50 12 L91 84 Q93 90 87 90 L13 90 Q7 90 9 84 Z"
+            fill="url(#warnHi)"/>
+      <path d="M50 22 L85 82 L15 82 Z" fill="url(#warnInner)" opacity="0.55"/>
+      <rect x="46.6" y="34" width="6.8" height="30" rx="3.4"
+            fill="#ffffff" stroke="#4d0000" stroke-width="1.1"/>
+      <rect x="47.8" y="35.6" width="2.2" height="20" rx="1.1"
+            fill="#ffffff" opacity="0.85"/>
+      <circle cx="50" cy="76" r="4.6"
+              fill="#ffffff" stroke="#4d0000" stroke-width="1.1"/>
+      <circle cx="48.8" cy="74.8" r="1.6" fill="#ffffff" opacity="0.9"/>
+    </symbol>
+
+    <symbol id="icon-stop" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="21" fill="url(#sysRed)" stroke="#6b0000" stroke-width="2"/>
+      <circle cx="24" cy="24" r="21" fill="#fff" opacity="0.12"/>
+      <path d="M16 16 L32 32 M32 16 L16 32" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-alert-triangle" viewBox="0 0 48 48">
+      <path d="M24 6 L44 40 Q46 44 42 44 L6 44 Q2 44 4 40 Z"
+            fill="url(#sysYellow)" stroke="#7a5c00" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M24 6 L44 40 Q46 44 42 44 L6 44 Q2 44 4 40 Z" fill="#ffffff" opacity="0.18"/>
+      <rect x="21.5" y="17" width="5" height="13" rx="2.5" fill="#3a2e00"/>
+      <circle cx="24" cy="35" r="2.8" fill="#3a2e00"/>
+    </symbol>
+    <symbol id="icon-flame" viewBox="0 0 48 48">
+      <path d="M24 4 C20 12 14 16 14 26 C14 34 18 40 24 42 C30 40 34 34 34 26 C34 18 28 14 24 4 Z"
+            fill="url(#sysOrange)" stroke="#7a2900" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M24 16 C22 20 20 22 20 27 C20 31 21.5 34 24 35 C26.5 34 28 31 28 27 C28 23 26 20 24 16 Z"
+            fill="#fff3b8" opacity="0.85"/>
+    </symbol>
+    <symbol id="icon-skull" viewBox="0 0 48 48">
+      <path d="M24 4 C14 4 8 10 8 18 C8 24 12 28 16 30 L16 38 Q16 42 20 42 L28 42 Q32 42 32 38 L32 30 C36 28 40 24 40 18 C40 10 34 4 24 4 Z"
+            fill="url(#sysGray)" stroke="#3a3a3e" stroke-width="2"/>
+      <circle cx="17" cy="18" r="4" fill="#2a2a2e"/>
+      <circle cx="31" cy="18" r="4" fill="#2a2a2e"/>
+      <path d="M21 28 L24 24 L27 28" fill="none" stroke="#3a3a3e" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M20 36 L20 42 M28 36 L28 42" stroke="#3a3a3e" stroke-width="2"/>
+    </symbol>
+    <symbol id="icon-alert-octagon" viewBox="0 0 48 48">
+      <path d="M15 4 L33 4 L44 15 L44 33 L33 44 L15 44 L4 33 L4 15 Z"
+            fill="url(#sysRed)" stroke="#6b0000" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M15 4 L33 4 L44 15 L44 33 L33 44 L15 44 L4 33 L4 15 Z" fill="#ffffff" opacity="0.12"/>
+      <path d="M24 13 V27" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+      <circle cx="24" cy="34" r="2.8" fill="#fff"/>
+    </symbol>
+    <symbol id="icon-eye" viewBox="0 0 48 48">
+      <path d="M24 10 C12 10 4 24 4 24 C4 24 12 38 24 38 C36 38 44 24 44 24 C44 24 36 10 24 10 Z"
+            fill="url(#sysGray)" stroke="#3a3a3e" stroke-width="2"/>
+      <circle cx="24" cy="24" r="7" fill="#2196f3" stroke="#0d5fa8" stroke-width="1.5"/>
+      <circle cx="24" cy="24" r="3" fill="#0a2a4a"/>
+      <circle cx="22" cy="22" r="1.5" fill="#ffffff"/>
+    </symbol>
+    <symbol id="icon-lock" viewBox="0 0 48 48">
+      <path d="M14 24 V16 C14 10 18 6 24 6 C30 6 34 10 34 16 V24"
+            fill="none" stroke="#7a5c00" stroke-width="4" stroke-linecap="round"/>
+      <rect x="8" y="22" width="32" height="22" rx="4"
+            fill="url(#sysYellow)" stroke="#7a5c00" stroke-width="2"/>
+      <rect x="8" y="22" width="32" height="8" fill="#ffffff" opacity="0.18"/>
+      <circle cx="24" cy="33" r="3" fill="#3a2e00"/>
+      <rect x="22.5" y="33" width="3" height="6" rx="1" fill="#3a2e00"/>
+    </symbol>
+    <symbol id="icon-refresh" viewBox="0 0 48 48">
+      <path d="M38 22 A16 16 0 0 0 10 22" fill="none" stroke="url(#sysBlue)" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M10 26 A16 16 0 0 0 38 26" fill="none" stroke="url(#sysBlue)" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M10 22 L4 16 M10 22 L4 28" fill="none" stroke="#0d5fa8" stroke-width="3" stroke-linecap="round"/>
+      <path d="M38 26 L44 20 M38 26 L44 32" fill="none" stroke="#0d5fa8" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-zap" viewBox="0 0 48 48">
+      <path d="M27 4 L10 26 H22 L20 44 L38 20 H26 Z"
+            fill="url(#sysYellow)" stroke="#7a5c00" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M27 4 L22 18 L26 18 L20 30 L26 30 L22 44"
+            fill="none" stroke="#fffbe0" stroke-width="1.5" opacity="0.55"/>
+    </symbol>
+    <symbol id="icon-slash" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="20" fill="url(#sysRed)" stroke="#6b0000" stroke-width="2"/>
+      <circle cx="24" cy="24" r="20" fill="#fff" opacity="0.12"/>
+      <line x1="10" y1="10" x2="38" y2="38" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div id="warnings"></div>
+<div id="label"></div>
+<div id="vignette"></div>
+<button id="escHint" type="button">[ ESC 暂停 ]</button>
+
+<script>
+(async () => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const params = new URLSearchParams(location.search);
+
+  /* ================================================================
+     sessionStorage 探测
+     ================================================================ */
+  const SS = (() => {
+    try {
+      const s = window.sessionStorage;
+      s.setItem('__probe', '1');
+      s.removeItem('__probe');
+      return s;
+    } catch (e) { return null; }
+  })();
+
+  const readNum = k => {
+    try { return parseInt(SS && SS.getItem(k), 10) || 0; }
+    catch (e) { return 0; }
+  };
+  const writeNum = (k, v) => {
+    try { SS && SS.setItem(k, String(v)); } catch (e) {}
+  };
+
+  /* ================================================================
+     四层存储（按 id 哈希分片）
+     ================================================================ */
+  const Storage = (() => {
+    const mem = new Map();
+    let idb = null, opfsRoot = null, cache = null;
+
+    function shard(id) {
+      let h = 0;
+      for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+      return h % 4;
+    }
+
+    async function init() {
+      try {
+        idb = await new Promise((res, rej) => {
+          const req = indexedDB.open('sysFault', 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('dialogs')) {
+              db.createObjectStore('dialogs', { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = () => res(req.result);
+          req.onerror = () => rej(req.error);
+        });
+      } catch (e) { idb = null; }
+
+      try {
+        if (navigator.storage && navigator.storage.getDirectory) {
+          opfsRoot = await navigator.storage.getDirectory();
+        }
+      } catch (e) { opfsRoot = null; }
+
+      try {
+        if (typeof caches !== 'undefined') cache = await caches.open('sysFault');
+      } catch (e) { cache = null; }
+
+      if (SS) {
+        try {
+          for (let i = 0; i < SS.length; i++) {
+            const k = SS.key(i);
+            if (k && k.startsWith('dlg_')) {
+              try {
+                const d = JSON.parse(SS.getItem(k));
+                if (d && d.id) mem.set(d.id, d);
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (idb) {
+        try {
+          await new Promise(res => {
+            const tx = idb.transaction('dialogs');
+            const req = tx.objectStore('dialogs').getAll();
+            req.onsuccess = () => {
+              (req.result || []).forEach(d => { if (d && d.id) mem.set(d.id, d); });
+              res();
+            };
+            req.onerror = res; req.onabort = res;
+          });
+        } catch (e) {}
+      }
+
+      if (cache) {
+        try {
+          const keys = await cache.keys();
+          for (const req of keys) {
+            if (req.url.indexOf('/dlg/') === -1) continue;
+            try {
+              const r = await cache.match(req);
+              if (!r) continue;
+              const d = await r.json();
+              if (d && d.id) mem.set(d.id, d);
+            } catch (e) {}
+          }
+        } catch (e) {}
+      }
+
+      if (opfsRoot && typeof opfsRoot.entries === 'function') {
+        try {
+          for await (const [name, handle] of opfsRoot.entries()) {
+            if (!name.startsWith('dlg_') || !name.endsWith('.json')) continue;
+            try {
+              const f = await handle.getFile();
+              const d = JSON.parse(await f.text());
+              if (d && d.id) mem.set(d.id, d);
+            } catch (e) {}
+          }
+        } catch (e) {}
+      }
+    }
+
+    function idbPut(d) {
+      if (!idb) return;
+      try { idb.transaction('dialogs', 'readwrite').objectStore('dialogs').put(d); }
+      catch (e) {}
+    }
+    function idbDel(id) {
+      if (!idb) return;
+      try { idb.transaction('dialogs', 'readwrite').objectStore('dialogs').delete(id); }
+      catch (e) {}
+    }
+    function cachePut(d, json) {
+      if (!cache) return;
+      cache.put('/dlg/' + d.id, new Response(json, {
+        headers: { 'Content-Type': 'application/json' }
+      })).catch(() => {});
+    }
+    function cacheDel(id) {
+      if (!cache) return;
+      cache.delete('/dlg/' + id).catch(() => {});
+    }
+    function opfsPut(d, json) {
+      if (!opfsRoot) return;
+      (async () => {
+        try {
+          const fh = await opfsRoot.getFileHandle('dlg_' + d.id + '.json', { create: true });
+          const w = await fh.createWritable();
+          await w.write(json);
+          await w.close();
+        } catch (e) {}
+      })();
+    }
+    function opfsDel(id) {
+      if (!opfsRoot) return;
+      (async () => { try { await opfsRoot.removeEntry('dlg_' + id + '.json'); } catch (e) {} })();
+    }
+
+    function persist(d) {
+      const s = shard(d.id);
+      const json = JSON.stringify(d);
+      if (s === 0) {
+        if (SS) {
+          try { SS.setItem('dlg_' + d.id, json); return; }
+          catch (e) { idbPut(d); return; }
+        }
+        idbPut(d); return;
+      }
+      if (s === 1) { idbPut(d); return; }
+      if (s === 2) { cachePut(d, json); return; }
+      if (s === 3) { opfsPut(d, json); return; }
+      idbPut(d);
+    }
+
+    function put(d) { mem.set(d.id, d); persist(d); }
+    function update(id, patch) {
+      const d = mem.get(id);
+      if (!d) return;
+      Object.assign(d, patch);
+      persist(d);
+    }
+    function remove(id) {
+      mem.delete(id);
+      if (SS) { try { SS.removeItem('dlg_' + id); } catch (e) {} }
+      idbDel(id); cacheDel(id); opfsDel(id);
+    }
+
+    async function clear() {
+      mem.clear();
+      if (SS) {
+        try {
+          SS.removeItem('warnCount');
+          SS.removeItem('dlgCount');
+          for (let i = SS.length - 1; i >= 0; i--) {
+            const k = SS.key(i);
+            if (k && (k.startsWith('dlg_') || k.startsWith('junk_'))) SS.removeItem(k);
+          }
+        } catch (e) {}
+      }
+      if (idb) {
+        try {
+          await new Promise(res => {
+            const tx = idb.transaction('dialogs', 'readwrite');
+            tx.objectStore('dialogs').clear();
+            tx.oncomplete = res; tx.onerror = res; tx.onabort = res;
+          });
+        } catch (e) {}
+      }
+      if (cache) {
+        try {
+          const keys = await cache.keys();
+          for (const req of keys) {
+            if (req.url.indexOf('/dlg/') !== -1) await cache.delete(req);
+          }
+        } catch (e) {}
+      }
+      if (opfsRoot && typeof opfsRoot.entries === 'function') {
+        try {
+          const names = [];
+          for await (const [name] of opfsRoot.entries()) {
+            if (name.startsWith('dlg_') && name.endsWith('.json')) names.push(name);
+          }
+          for (const name of names) {
+            try { await opfsRoot.removeEntry(name); } catch (e) {}
+          }
+        } catch (e) {}
+      }
+    }
+
+    function getAll() { return Array.from(mem.values()); }
+
+    return { init, put, update, remove, clear, getAll };
+  })();
+
+  try { await Storage.init(); } catch (e) {}
+
+  if (params.has('reset')) {
+    try { await Storage.clear(); } catch (e) {}
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  }
+
+  /* ================================================================
+     计数
+     ================================================================ */
+  const count = readNum('warnCount') + 1;
+  writeNum('warnCount', count);
+
+  if (SS) {
+    try {
+      for (let i = SS.length - 1; i >= 0; i--) {
+        const k = SS.key(i);
+        if (k && k.indexOf('junk_') === 0) SS.removeItem(k);
+      }
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-.';
+      const len = 120 + Math.floor(Math.random() * 200);
+      const buf = new Array(len);
+      for (let i = 0; i < len; i++) buf[i] = chars[(Math.random() * chars.length) | 0];
+      SS.setItem('junk_' + Date.now().toString(36), buf.join(''));
+    } catch (e) {}
+  }
+
+  /* ================================================================
+     音频
+     ================================================================ */
+  let ac = null, bus = null, muted = false;
+
+  function initAudio() {
+    if (ac) {
+      if (ac.state === 'suspended') ac.resume().catch(() => {});
+      return;
+    }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try { ac = new AC(); } catch (e) { ac = null; return; }
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 6;
+    comp.ratio.value = 12; comp.attack.value = 0.002; comp.release.value = 0.2;
+    bus = ac.createGain(); bus.gain.value = 0.3;
+    bus.connect(comp); comp.connect(ac.destination);
+    if (ac.state === 'suspended') ac.resume().catch(() => {});
+  }
+
+  function schedule(fn) {
+    if (!ac || muted) return;
+    if (ac.state === 'running') { fn(); return; }
+    ac.resume().then(() => {
+      if (ac.state === 'running' && !muted) fn();
+    }).catch(() => {});
+  }
+
+  function noiseBuffer(sec) {
+    const len = (ac.sampleRate * sec) | 0;
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function playPianoDread(vol = 0.25) {
+    schedule(() => {
+      const t = ac.currentTime, base = 130.81;
+      [base, base * 1.0595].forEach((f, i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol * (i ? 0.85 : 1), t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+        o.connect(g); g.connect(bus);
+        o.start(t); o.stop(t + 1.7);
+      });
+    });
+  }
+
+  function playJawsPulse(steps = 6, vol = 0.3) {
+    schedule(() => {
+      let t = ac.currentTime, interval = 0.28;
+      for (let i = 0; i < steps; i++) {
+        const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+        o1.type = o2.type = 'sawtooth';
+        const f = i % 2 ? 55 : 58.3;
+        o1.frequency.value = f; o2.frequency.value = f * 1.01;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + interval * 0.9);
+        o1.connect(g); o2.connect(g); g.connect(bus);
+        o1.start(t); o2.start(t);
+        o1.stop(t + interval); o2.stop(t + interval);
+        interval *= 0.78; t += interval;
+      }
+    });
+  }
+
+  function playStinger(vol = 0.5) {
+    schedule(() => {
+      const t = ac.currentTime;
+      const src = ac.createBufferSource(), nf = ac.createBiquadFilter(), ng = ac.createGain();
+      src.buffer = noiseBuffer(0.3);
+      nf.type = 'bandpass'; nf.frequency.value = 1500; nf.Q.value = 0.8;
+      ng.gain.setValueAtTime(vol, t);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      src.connect(nf); nf.connect(ng); ng.connect(bus);
+      src.start(t); src.stop(t + 0.3);
+
+      const o = ac.createOscillator(), og = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(120, t);
+      o.frequency.exponentialRampToValueAtTime(30, t + 0.25);
+      og.gain.setValueAtTime(vol * 1.2, t);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(og); og.connect(bus);
+      o.start(t); o.stop(t + 0.32);
+    });
+  }
+
+  function playViolinScream(vol = 0.35) {
+    schedule(() => {
+      const t = ac.currentTime;
+      [0, 7].forEach((det, i) => {
+        const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(3200, t);
+        o.frequency.exponentialRampToValueAtTime(1800, t + 0.05);
+        o.frequency.exponentialRampToValueAtTime(2400, t + 0.35);
+        o.detune.value = det * (i ? -1 : 1);
+        f.type = 'bandpass'; f.frequency.value = 3000; f.Q.value = 1.2;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol * (i ? 0.7 : 1), t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+        o.connect(f); f.connect(g); g.connect(bus);
+        o.start(t); o.stop(t + 0.4);
+      });
+    });
+  }
+
+  function playHorrorScene(n) {
+    playPianoDread(0.25);
+    const steps = Math.min(4 + Math.floor(n / 2), 10);
+    setTimeout(() => {
+      playJawsPulse(steps, 0.3);
+      const dur = 0.28 * (1 - Math.pow(0.78, steps)) / (1 - 0.78);
+      setTimeout(() => {
+        playStinger(0.5);
+        setTimeout(() => playViolinScream(0.35), 80);
+      }, Math.max(400, dur * 1000));
+    }, 250);
+  }
+
+  function playExitBeep() {
+    if (!ac) return;
+    const run = () => {
+      const t = ac.currentTime;
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(1200, t);
+      o.frequency.exponentialRampToValueAtTime(300, t + 0.4);
+      g.gain.setValueAtTime(0.15, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      o.connect(g); g.connect(bus);
+      o.start(t); o.stop(t + 0.5);
+    };
+    if (ac.state === 'running') run();
+    else ac.resume().then(run).catch(() => {});
+  }
+
+  ['click', 'pointerdown', 'touchstart'].forEach(evt => {
+    document.addEventListener(evt, initAudio, { passive: true });
+  });
+  document.addEventListener('keydown', initAudio, { passive: true });
+
+  /* ================================================================
+     渲染警告
+     ================================================================ */
+  const warningsEl = $('warnings');
+  const label = $('label');
+  const vignette = $('vignette');
+  const escHint = $('escHint');
+
+  const n = count;
+  const parts = new Array(n);
+  for (let i = 0; i < n; i++) {
+    parts[i] =
+      '<svg class="warn" viewBox="0 0 100 100" aria-hidden="true" ' +
+      'style="animation-delay:' + ((i * 0.07) % 1.2).toFixed(2) + 's">' +
+        '<use href="#warnIcon"/>' +
+      '</svg>';
+  }
+  warningsEl.innerHTML = parts.join('');
+
+  if (n > 800)      warningsEl.className = 'ultra';
+  else if (n > 400) warningsEl.className = 'micro';
+  else if (n > 200) warningsEl.className = 'tiny';
+  else if (n > 80)  warningsEl.className = 'small';
+
+  if (!reduced && n > 60) warningsEl.classList.add('shake');
+
+  if (n > 120) {
+    label.style.display = 'block';
+    label.textContent = n > 400 ? '系统已失控' : '系统异常';
+  }
+  if (n > 150) {
+    document.body.classList.add('dark');
+    vignette.classList.add('on');
+    escHint.style.color = '#555';
+    label.style.color = 'rgba(255,59,48,.95)';
+  }
+
+  /* ================================================================
+     弹窗模板
+     ================================================================ */
+  const infoTemplates = [
+    { icon: 'icon-stop',           title: '系统错误', msg: '检测到无法恢复的错误。', sub: '错误代码: 0x' + Math.floor(Math.random() * 1e8).toString(16).toUpperCase() },
+    { icon: 'icon-alert-triangle', title: '警告',     msg: '内存写入失败，数据可能已损坏。', sub: '进程 ID: ' + (1000 + Math.floor(Math.random() * 9000)) },
+    { icon: 'icon-flame',          title: '严重错误', msg: '核心组件已停止响应。', sub: '模块: kernel32.dll' },
+    { icon: 'icon-skull',          title: '致命错误', msg: '系统即将崩溃，请立即保存工作。', sub: '堆栈跟踪已记录' },
+    { icon: 'icon-alert-octagon',  title: '数据丢失', msg: '无法读取磁盘扇区，文件可能丢失。', sub: '扇区: ' + Math.floor(Math.random() * 65536) },
+    { icon: 'icon-eye',            title: '未知进程', msg: '有程序正在监控你的操作。', sub: '来源: 未知' },
+    { icon: 'icon-lock',           title: '权限拒绝', msg: '当前用户无权访问该资源。', sub: '用户: guest' },
+    { icon: 'icon-refresh',        title: '无限循环', msg: '检测到递归调用，无法终止。', sub: '深度: ' + (count * 7 + 3) },
+    { icon: 'icon-zap',            title: '内存溢出', msg: '缓冲区已超出安全范围。', sub: '分配: ' + (200 + Math.floor(Math.random() * 3000)) + ' KB' },
+    { icon: 'icon-slash',          title: '未知错误', msg: '发生了一个不该发生的错误。', sub: '别问了，我也不懂' },
+  ];
+
+  const noiseTitles  = ['未知进程', '数据流', '控制台', '系统日志', '异常输出'];
+  const staticTitles = ['信号丢失', '雪花屏', '模拟信号异常', '视频源中断', '无信号'];
+
+  const HEX = '0123456789ABCDEF';
+  const BLOB = '▓▒░█▄▀■□▪▫◆◇○●※≠≡∷⌐¬±×÷∴∵≈≢⊂⊃∩∪';
+  const OPS = ['READ', 'WRITE', 'SEEK', 'FLUSH', 'ALLOC', 'FREE', 'OPEN', 'CLOSE',
+               'LOCK', 'SYNC', 'CRC', 'PARSE', 'DUMP', 'DECRYPT', 'MOUNT', 'SCAN'];
+  const FAILS = ['failed', 'timed out', 'returned -1', 'exceeded limit',
+                 'corrupted', 'retry', 'skipped', 'no space', 'bad sector',
+                 'refused', 'aborted', 'invalid state'];
+  const PRINTABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~';
+
+  function hex(len) {
+    let s = '';
+    for (let i = 0; i < len; i++) s += HEX[(Math.random() * 16) | 0];
+    return s;
+  }
+  function fromSet(set, len) {
+    let s = '';
+    for (let i = 0; i < len; i++) s += set[(Math.random() * set.length) | 0];
+    return s;
+  }
+
+  function targetLen() {
+    const r = Math.random();
+    if (r < 0.85) return 500 + ((Math.random() * 4500) | 0);
+    if (r < 0.97) return 5000 + ((Math.random() * 15000) | 0);
+    return 20000 + ((Math.random() * 80000) | 0);
+  }
+
+  function noiseLine() {
+    const len = targetLen();
+    const r = Math.random();
+    let s = '';
+
+    if (r < 0.30) {
+      while (s.length < len) {
+        s += '0x' + hex(4 + ((Math.random() * 4) | 0)) +
+             '  ' + hex(8 + ((Math.random() * 8) | 0)) + '  ';
+      }
+    } else if (r < 0.50) {
+      while (s.length < len) s += fromSet(BLOB, 32 + ((Math.random() * 64) | 0));
+    } else if (r < 0.70) {
+      while (s.length < len) {
+        s += '[' + OPS[(Math.random() * OPS.length) | 0] + '] ' +
+             FAILS[(Math.random() * FAILS.length) | 0] +
+             ' @ ' + hex(6) + '  ';
+      }
+    } else if (r < 0.85) {
+      while (s.length < len) {
+        s += '  at <anonymous> (' + hex(4) + ':' + ((Math.random() * 999) | 0) + ')  ';
+      }
+    } else {
+      while (s.length < len) s += fromSet(PRINTABLE, 64);
+    }
+
+    return s.slice(0, len);
+  }
+
+  /* ================================================================
+     终端弹窗
+     ================================================================ */
+  function startNoiseTicker(dlg) {
+    const linesEl = dlg.querySelector('.noise-lines');
+    if (!linesEl) return { stop() {} };
+
+    let stopped = false;
+    let timer = null;
+
+    for (let i = 0; i < 8; i++) {
+      const div = document.createElement('div');
+      div.textContent = noiseLine();
+      linesEl.appendChild(div);
+    }
+
+    function tick() {
+      if (stopped) return;
+      const div = document.createElement('div');
+      div.textContent = noiseLine();
+      linesEl.appendChild(div);
+      timer = setTimeout(tick, 50 + Math.random() * 120);
+    }
+    tick();
+
+    return { stop() { stopped = true; if (timer) clearTimeout(timer); } };
+  }
+
+  /* ================================================================
+     噪点图弹窗
+     ================================================================ */
+  function startStaticTicker(dlg) {
+    const canvas = dlg.querySelector('canvas');
+    if (!canvas) return { stop() {} };
+
+    const W = 160, H = 90;
+    canvas.width = W;
+    canvas.height = H;
+
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return { stop() {} };
+
+    const img = ctx.createImageData(W, H);
+    const data = img.data;
+
+    let stopped = false;
+    let raf = null;
+
+    function frame() {
+      if (stopped) return;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = (Math.random() * 256) | 0;
+        if (Math.random() < 0.03) {
+          data[i]     = (Math.random() * 256) | 0;
+          data[i + 1] = (Math.random() * 256) | 0;
+          data[i + 2] = (Math.random() * 256) | 0;
+        } else {
+          data[i]     = v;
+          data[i + 1] = v;
+          data[i + 2] = v;
+        }
+        data[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      raf = requestAnimationFrame(frame);
+    }
+    frame();
+
+    return {
+      stop() {
+        stopped = true;
+        if (raf) cancelAnimationFrame(raf);
+      }
+    };
+  }
+
+  function uid() {
+    return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  /* ================================================================
+     ★ 视口尺寸（统一入口）
+     —— 优先 visualViewport（移动端地址栏、软键盘变化），否则 inner
+     ================================================================ */
+  function viewportSize() {
+    const vv = window.visualViewport;
+    return {
+      w: (vv && vv.width)  || window.innerWidth  || document.documentElement.clientWidth  || 0,
+      h: (vv && vv.height) || window.innerHeight || document.documentElement.clientHeight || 0
+    };
+  }
+
+  /* ================================================================
+     ★ 弹窗定位：用相对比例 rx/ry（0~1）表达位置
+     —— 横竖屏、窗口缩放、折叠屏切换时都重新计算
+     ================================================================ */
+  const live = new Map();   // id -> { el, conf }
+
+  function clampUnit(v) {
+    return v < 0 ? 0 : (v > 1 ? 1 : v);
+  }
+
+  /**
+   * 把配置里的「位置」解析成相对比例 rx/ry：
+   *  - 已有 rx/ry → 直接用（新版数据）
+   *  - 只有 left/top → 反推（旧版数据，向后兼容）
+   *  - 都没有 → 随机
+   */
+  function resolveRatio(conf, elW, elH, vw, vh) {
+    if (typeof conf.rx === 'number' && typeof conf.ry === 'number') {
+      return { rx: clampUnit(conf.rx), ry: clampUnit(conf.ry) };
+    }
+    if (typeof conf.left === 'number' || typeof conf.top === 'number') {
+      const maxX = Math.max(1, vw - elW);
+      const maxY = Math.max(1, vh - elH);
+      return {
+        rx: clampUnit((conf.left || 0) / maxX),
+        ry: clampUnit((conf.top  || 0) / maxY)
+      };
+    }
+    return { rx: Math.random(), ry: Math.random() };
+  }
+
+  /**
+   * 根据比例把弹窗放到当前视口合适位置。
+   * 返回 { rx, ry, left, top } 方便回写 conf / Storage。
+   */
+  function placeDialog(el, conf) {
+    const { w: vw, h: vh } = viewportSize();
+    const elW = el.offsetWidth  || 300;
+    const elH = el.offsetHeight || 150;
+    const maxX = Math.max(0, vw - elW);
+    const maxY = Math.max(0, vh - elH);
+
+    const { rx, ry } = resolveRatio(conf, elW, elH, vw, vh);
+    const left = Math.min(Math.max(0, rx * maxX), maxX);
+    const top  = Math.min(Math.max(0, ry * maxY), maxY);
+
+    el.style.left = left + 'px';
+    el.style.top  = top  + 'px';
+    return { rx, ry, left, top };
+  }
+
+  /**
+   * ★ 视口变化时重排所有存活弹窗
+   * 用 rAF 节流，避免 orientationchange 时多次触发卡顿
+   */
+  let relayoutScheduled = false;
+  function scheduleRelayout() {
+    if (relayoutScheduled) return;
+    relayoutScheduled = true;
+    requestAnimationFrame(() => {
+      relayoutScheduled = false;
+      for (const [id, rec] of live) {
+        if (!rec.el.isConnected) { live.delete(id); continue; }
+        placeDialog(rec.el, rec.conf);
+      }
+    });
+  }
+
+  window.addEventListener('resize', scheduleRelayout);
+
+  // 移动端旋转：立即 + 延迟各触发一次，覆盖浏览器布局延迟
+  window.addEventListener('orientationchange', () => {
+    scheduleRelayout();
+    setTimeout(scheduleRelayout, 250);
+    setTimeout(scheduleRelayout, 700);
+  });
+
+  // 移动端地址栏显示/隐藏、软键盘弹出
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleRelayout);
+  }
+
+  // 老浏览器兜底：滚动时也可能改变可视区（虽然这里 body 不滚）
+  window.addEventListener('scroll', scheduleRelayout, { passive: true });
+
+  /* ================================================================
+     通用拖动
+     ================================================================ */
+  function makeDraggable(el, onEnd) {
+    const bar = el.querySelector('.titlebar');
+    let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+
+    bar.addEventListener('pointerdown', e => {
+      if (e.target.hasAttribute('data-x')) return;
+      dragging = true;
+      sx = e.clientX; sy = e.clientY;
+      ox = parseInt(el.style.left, 10) || 0;
+      oy = parseInt(el.style.top, 10) || 0;
+      el.style.zIndex = 2000 + ((Math.random() * 500) | 0);
+      try { bar.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    bar.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      el.style.left = (ox + e.clientX - sx) + 'px';
+      el.style.top = (oy + e.clientY - sy) + 'px';
+    });
+
+    const end = e => {
+      if (!dragging) return;
+      dragging = false;
+      const { w: vw, h: vh } = viewportSize();
+      const maxX = Math.max(0, vw - el.offsetWidth);
+      const maxY = Math.max(0, vh - el.offsetHeight);
+      const x = Math.min(Math.max(0, parseInt(el.style.left, 10) || 0), maxX);
+      const y = Math.min(Math.max(0, parseInt(el.style.top, 10) || 0), maxY);
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      try { bar.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (onEnd) onEnd(x, y);
+    };
+    bar.addEventListener('pointerup', end);
+    bar.addEventListener('pointercancel', end);
+  }
+
+  /* ================================================================
+     渲染单个弹窗
+     ================================================================ */
+  function renderDialog(conf) {
+    const type = conf.type || 'info';
+    const dlg = document.createElement('div');
+    dlg.className = 'fakeDialog' +
+      (type === 'web' ? ' web' : '') +
+      (type === 'noise' ? ' noise' : '') +
+      (type === 'static' ? ' static' : '');
+
+    let ticker = null;
+
+    if (type === 'web') {
+      dlg.innerHTML =
+        '<div class="titlebar">' +
+          '<span></span>' +
+          '<span class="btns"><span data-x>✕</span></span>' +
+        '</div>' +
+        '<div class="web-body"><iframe scrolling="no" title="实时监控画面"></iframe></div>' +
+        '<div class="footer"><button data-ok>确定</button></div>';
+      dlg.querySelector('.titlebar span').textContent = conf.title || '系统监控';
+      dlg.querySelector('iframe').src = conf.url || location.pathname;
+
+    } else if (type === 'noise') {
+      dlg.innerHTML =
+        '<div class="titlebar">' +
+          '<span></span>' +
+          '<span class="btns"><span data-x>✕</span></span>' +
+        '</div>' +
+        '<div class="noise-body"><div class="noise-lines"></div></div>' +
+        '<div class="footer"><button data-ok>确定</button></div>';
+      dlg.querySelector('.titlebar span').textContent = conf.title || '未知进程';
+
+    } else if (type === 'static') {
+      dlg.innerHTML =
+        '<div class="titlebar">' +
+          '<span></span>' +
+          '<span class="btns"><span data-x>✕</span></span>' +
+        '</div>' +
+        '<div class="static-body"><canvas></canvas></div>' +
+        '<div class="footer"><button data-ok>确定</button></div>';
+      dlg.querySelector('.titlebar span').textContent = conf.title || '信号丢失';
+
+    } else {
+      dlg.innerHTML =
+        '<div class="titlebar">' +
+          '<span></span>' +
+          '<span class="btns"><span data-x>✕</span></span>' +
+        '</div>' +
+        '<div class="body">' +
+          '<div class="icon"></div>' +
+          '<div class="msg"><span class="t"></span><span class="sub"></span></div>' +
+        '</div>' +
+        '<div class="footer"><button data-ok>确定</button></div>';
+      dlg.querySelector('.titlebar span').textContent = conf.title || '';
+      dlg.querySelector('.icon').innerHTML = conf.icon
+        ? '<svg viewBox="0 0 48 48" aria-hidden="true"><use href="#' + conf.icon + '"/></svg>'
+        : '';
+      dlg.querySelector('.msg .t').textContent = conf.msg || '';
+      dlg.querySelector('.msg .sub').textContent = conf.sub || '';
+    }
+
+    document.body.appendChild(dlg);
+
+    /* ★ 用比例定位，并把解析结果回写到 conf / Storage */
+    const pos = placeDialog(dlg, conf);
+    conf.rx = pos.rx; conf.ry = pos.ry;
+    conf.left = pos.left; conf.top = pos.top;
+    Storage.update(conf.id, { rx: pos.rx, ry: pos.ry, left: pos.left, top: pos.top });
+
+    dlg.style.zIndex = 1000 + ((Math.random() * 800) | 0);
+
+    live.set(conf.id, { el: dlg, conf });
+
+    const close = () => {
+      if (ticker) { ticker.stop(); ticker = null; }
+      live.delete(conf.id);
+      dlg.remove();
+      Storage.remove(conf.id);
+    };
+    dlg.querySelector('[data-x]').addEventListener('click', close);
+    dlg.querySelector('[data-ok]').addEventListener('click', close);
+
+    /* ★ 拖动结束后把绝对坐标反算成比例存起来 */
+    makeDraggable(dlg, (px, py) => {
+      const { w: vw, h: vh } = viewportSize();
+      const maxX = Math.max(1, vw - dlg.offsetWidth);
+      const maxY = Math.max(1, vh - dlg.offsetHeight);
+      const rx = clampUnit(px / maxX);
+      const ry = clampUnit(py / maxY);
+      conf.rx = rx; conf.ry = ry;
+      conf.left = px; conf.top = py;
+      Storage.update(conf.id, { rx, ry, left: px, top: py });
+    });
+
+    if (type === 'noise') {
+      ticker = startNoiseTicker(dlg);
+    } else if (type === 'static') {
+      ticker = startStaticTicker(dlg);
+    }
+  }
+
+  /* ================================================================
+     加载历史 + 生成新弹窗
+     ================================================================ */
+  const allDialogs = Storage.getAll();
+  const nextIndex = allDialogs.length + 1;
+
+  /* ★ 新弹窗只用 rx/ry，不带绝对像素，跨屏无缝 */
+  let newDlg;
+  if (nextIndex % 5 === 0) {
+    newDlg = {
+      id: uid(), type: 'web',
+      title: '系统监控 · 实时画面',
+      url: location.pathname,
+      rx: Math.random(), ry: Math.random()
+    };
+  } else if (nextIndex % 4 === 0) {
+    newDlg = {
+      id: uid(), type: 'noise',
+      title: noiseTitles[(Math.random() * noiseTitles.length) | 0],
+      rx: Math.random(), ry: Math.random()
+    };
+  } else if (nextIndex % 3 === 0) {
+    newDlg = {
+      id: uid(), type: 'static',
+      title: staticTitles[(Math.random() * staticTitles.length) | 0],
+      rx: Math.random(), ry: Math.random()
+    };
+  } else {
+    const tpl = infoTemplates[(count + allDialogs.length) % infoTemplates.length];
+    newDlg = {
+      id: uid(), type: 'info',
+      icon: tpl.icon, title: tpl.title, msg: tpl.msg, sub: tpl.sub,
+      rx: Math.random(), ry: Math.random()
+    };
+  }
+
+  Storage.put(newDlg);
+
+  const renderOrder = shuffle(allDialogs.slice());
+  renderOrder.forEach(d => renderDialog(d));
+
+  /* ================================================================
+     音效
+     ================================================================ */
+  initAudio();
+  setTimeout(() => playHorrorScene(n), 80);
+
+  /* ================================================================
+     自动重定向
+     ================================================================ */
+  let cancelled = false;
+  let redirectTimer = null;
+
+  function redirect() {
+    if (cancelled) return;
+    location.replace(location.pathname);
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (cancelled) return;
+      redirectTimer = setTimeout(redirect, 500);
+    });
+  });
+
+  /* ================================================================
+     ESC / 点击退出
+     ================================================================ */
+  let exited = false;
+
+  async function bail() {
+    if (exited) {
+      await Storage.clear();
+      location.replace(location.pathname);
+      return;
+    }
+    exited = true;
+    cancelled = true;
+    clearTimeout(redirectTimer);
+    document.body.classList.add('paused');
+    await Storage.clear();
+    muted = true;
+    escHint.textContent = '[ 已暂停 · 点击重新开始 ]';
+    escHint.style.color = '#ff3b30';
+    initAudio();
+    playExitBeep();
+  }
+
+  escHint.addEventListener('click', bail);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      bail();
+    }
+  });
+})();
+</script>
+</body>
+</html>
